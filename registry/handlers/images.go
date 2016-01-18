@@ -15,6 +15,12 @@ import (
 	"github.com/docker/distribution/registry/api/v2"
 	"github.com/gorilla/handlers"
 	"golang.org/x/net/context"
+
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
+	"os"
+	"path/filepath"
+	"time"
 )
 
 // imageManifestDispatcher takes the request context and builds the
@@ -32,6 +38,13 @@ func imageManifestDispatcher(ctx *Context, r *http.Request) http.Handler {
 		imageManifestHandler.Digest = dgst
 	}
 
+	/****/
+	storageParams := ctx.App.Config.Storage.Parameters()
+	dbPath := filepath.Join(fmt.Sprint(storageParams["rootdirectory"]), "registry.sqlite3")
+	os.MkdirAll(filepath.Dir(dbPath), 0755)
+	imageManifestHandler.db, _ = sql.Open("sqlite3", dbPath)
+	/****/
+
 	mhandler := handlers.MethodHandler{
 		"GET": http.HandlerFunc(imageManifestHandler.GetImageManifest),
 	}
@@ -47,6 +60,8 @@ func imageManifestDispatcher(ctx *Context, r *http.Request) http.Handler {
 // imageManifestHandler handles http operations on image manifests.
 type imageManifestHandler struct {
 	*Context
+
+	db *sql.DB
 
 	// One of tag or digest gets set, depending on what is present in context.
 	Tag    string
@@ -197,6 +212,16 @@ func (imh *imageManifestHandler) PutImageManifest(w http.ResponseWriter, r *http
 		ctxu.GetLogger(imh).Errorf("error building manifest url from digest: %v", err)
 	}
 
+	/* GEGIN *****************/
+	if imh.db != nil {
+		query := "replace into repositories(repository) values(?)"
+		if _, err := imh.db.Exec(query, imh.Repository.Name()); err == nil {
+			query = "replace into tags(repository, tag, digest, url, updated_at, status, description, target_url) values(?,?,?,?,?,'unset','','')"
+			imh.db.Exec(query, imh.Repository.Name(), imh.Tag, imh.Digest.String(), "", time.Now())
+		}
+	}
+	/* END *****************/
+
 	w.Header().Set("Location", location)
 	w.Header().Set("Docker-Content-Digest", imh.Digest.String())
 	w.WriteHeader(http.StatusCreated)
@@ -230,6 +255,16 @@ func (imh *imageManifestHandler) DeleteImageManifest(w http.ResponseWriter, r *h
 			return
 		}
 	}
+
+	/* GEGIN *****************/
+	if imh.db != nil {
+		query := "delete from tags where repository=? and digest=?"
+		_, err = imh.db.Exec(query, imh.Repository.Name(), imh.Digest.String())
+		if err == nil {
+			imh.db.Exec("delete from repositories where repository not in (select distinct repository from tags)")
+		}
+	}
+	/* END *****************/
 
 	w.WriteHeader(http.StatusAccepted)
 }

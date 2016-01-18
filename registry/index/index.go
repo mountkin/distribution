@@ -104,9 +104,9 @@ func (self *IndexService) Write(events ...notifications.Event) error {
 					return err
 				}
 			} else if event.Action == notifications.EventActionPush {
-				if err := self.add(event); err != nil {
-					return err
-				}
+				// if err := self.add(event); err != nil {
+				// 	return err
+				// }
 			}
 		}
 	}
@@ -131,7 +131,6 @@ func (self *IndexService) add(event notifications.Event) error {
 		logrus.Error("sqlite insert: ", err)
 		return err
 	}
-
 	query = "replace into tags(repository, tag, digest, url, updated_at, status, description, target_url) values(?,?,?,?,?,'unset','','')"
 	tag := self.parseTag(event.Target.URL)
 	if _, err := self.db.Exec(query, target.Repository, tag, string(target.Digest), target.URL, time.Now()); err != nil {

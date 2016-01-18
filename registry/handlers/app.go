@@ -140,8 +140,6 @@ func NewApp(ctx context.Context, configuration *configuration.Configuration) *Ap
 	}
 
 	app.configureIndex(configuration)
-
-	app.configureIndex(configuration)
 	app.configureSecret(configuration)
 	app.configureEvents(configuration)
 	app.configureRedis(configuration)

@@ -16,7 +16,7 @@ import (
 )
 
 const driverName = "filesystem"
-const defaultRootDirectory = "/tmp/registry/storage"
+const defaultRootDirectory = "/var/lib/registry"
 
 func init() {
 	factory.Register(driverName, &filesystemDriverFactory{})
@@ -184,9 +184,6 @@ func (d *driver) Stat(ctx context.Context, subPath string) (storagedriver.FileIn
 // List returns a list of the objects that are direct descendants of the given
 // path.
 func (d *driver) List(ctx context.Context, subPath string) ([]string, error) {
-	if subPath[len(subPath)-1] != '/' {
-		subPath += "/"
-	}
 	fullPath := d.fullPath(subPath)
 
 	dir, err := os.Open(fullPath)
@@ -248,7 +245,7 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
-	return "", storagedriver.ErrUnsupportedMethod
+	return "", storagedriver.ErrUnsupportedMethod{}
 }
 
 // fullPath returns the absolute path of a key within the Driver's storage.

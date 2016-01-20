@@ -201,7 +201,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 func New(params DriverParameters) (*Driver, error) {
 	auth, err := aws.GetAuth(params.AccessKey, params.SecretKey, "", time.Time{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to resolve aws credentials, please ensure that 'accesskey' and 'secretkey' are properly set or the credentials are available in $HOME/.aws/credentials: %v", err)
 	}
 
 	if !params.Secure {
@@ -217,12 +217,6 @@ func New(params DriverParameters) (*Driver, error) {
 		if params.Region.Name == "eu-central-1" {
 			return nil, fmt.Errorf("The eu-central-1 region only works with v4 authentication")
 		}
-	}
-
-	// Validate that the given credentials have at least read permissions in the
-	// given bucket scope.
-	if _, err := bucket.List(strings.TrimRight(params.RootDirectory, "/"), "", "", 1); err != nil {
-		return nil, err
 	}
 
 	// TODO Currently multipart uploads have no timestamps, so this would be unwise
@@ -673,7 +667,8 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 }
 
 // List returns a list of the objects that are direct descendants of the given path.
-func (d *driver) List(ctx context.Context, path string) ([]string, error) {
+func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
+	path := opath
 	if path != "/" && path[len(path)-1] != '/' {
 		path = path + "/"
 	}
@@ -688,7 +683,7 @@ func (d *driver) List(ctx context.Context, path string) ([]string, error) {
 
 	listResponse, err := d.Bucket.List(d.s3Path(path), "/", "", listMax)
 	if err != nil {
-		return nil, err
+		return nil, parseError(opath, err)
 	}
 
 	files := []string{}
@@ -710,6 +705,14 @@ func (d *driver) List(ctx context.Context, path string) ([]string, error) {
 			}
 		} else {
 			break
+		}
+	}
+
+	if opath != "/" {
+		if len(files) == 0 && len(directories) == 0 {
+			// Treat empty response as missing directory, since we don't actually
+			// have directories in s3.
+			return nil, storagedriver.PathNotFoundError{Path: opath}
 		}
 	}
 
@@ -765,7 +768,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 	if ok {
 		methodString, ok = method.(string)
 		if !ok || (methodString != "GET" && methodString != "HEAD") {
-			return "", storagedriver.ErrUnsupportedMethod
+			return "", storagedriver.ErrUnsupportedMethod{}
 		}
 	}
 

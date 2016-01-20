@@ -6,25 +6,23 @@ import (
 	"testing"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
 	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/docker/distribution/uuid"
 )
-
-var pm = defaultPathMapper
 
 func testUploadFS(t *testing.T, numUploads int, repoName string, startedAt time.Time) (driver.StorageDriver, context.Context) {
 	d := inmemory.New()
 	ctx := context.Background()
 	for i := 0; i < numUploads; i++ {
-		addUploads(ctx, t, d, uuid.New(), repoName, startedAt)
+		addUploads(ctx, t, d, uuid.Generate().String(), repoName, startedAt)
 	}
 	return d, ctx
 }
 
 func addUploads(ctx context.Context, t *testing.T, d driver.StorageDriver, uploadID, repo string, startedAt time.Time) {
-	dataPath, err := pm.path(uploadDataPathSpec{name: repo, uuid: uploadID})
+	dataPath, err := pathFor(uploadDataPathSpec{name: repo, id: uploadID})
 	if err != nil {
 		t.Fatalf("Unable to resolve path")
 	}
@@ -32,7 +30,7 @@ func addUploads(ctx context.Context, t *testing.T, d driver.StorageDriver, uploa
 		t.Fatalf("Unable to write data file")
 	}
 
-	startedAtPath, err := pm.path(uploadStartedAtPathSpec{name: repo, uuid: uploadID})
+	startedAtPath, err := pathFor(uploadStartedAtPathSpec{name: repo, id: uploadID})
 	if err != nil {
 		t.Fatalf("Unable to resolve path")
 	}
@@ -73,7 +71,7 @@ func TestPurgeAll(t *testing.T) {
 	fs, ctx := testUploadFS(t, uploadCount, "test-repo", oneHourAgo)
 
 	// Ensure > 1 repos are purged
-	addUploads(ctx, t, fs, uuid.New(), "test-repo2", oneHourAgo)
+	addUploads(ctx, t, fs, uuid.Generate().String(), "test-repo2", oneHourAgo)
 	uploadCount++
 
 	deleted, errs := PurgeUploads(ctx, fs, time.Now(), true)
@@ -95,7 +93,7 @@ func TestPurgeSome(t *testing.T) {
 	newUploadCount := 4
 
 	for i := 0; i < newUploadCount; i++ {
-		addUploads(ctx, t, fs, uuid.New(), "test-repo", time.Now().Add(1*time.Hour))
+		addUploads(ctx, t, fs, uuid.Generate().String(), "test-repo", time.Now().Add(1*time.Hour))
 	}
 
 	deleted, errs := PurgeUploads(ctx, fs, time.Now(), true)
@@ -115,7 +113,7 @@ func TestPurgeOnlyUploads(t *testing.T) {
 
 	// Create a directory tree outside _uploads and ensure
 	// these files aren't deleted.
-	dataPath, err := pm.path(uploadDataPathSpec{name: "test-repo", uuid: uuid.New()})
+	dataPath, err := pathFor(uploadDataPathSpec{name: "test-repo", id: uuid.Generate().String()})
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

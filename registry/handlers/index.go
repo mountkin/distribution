@@ -46,7 +46,7 @@ func (ih *indexHandler) GetPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		ih.Errors.PushErr(err)
+		ih.Errors = append(ih.Errors, err)
 		return
 	}
 }

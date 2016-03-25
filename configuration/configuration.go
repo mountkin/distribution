@@ -223,6 +223,10 @@ func (storage *Storage) UnmarshalYAML(unmarshal func(interface{}) error) error {
 					// allow for configuration of maintenance
 				case "cache":
 					// allow configuration of caching
+				case "delete":
+					// allow configuration of delete
+				case "redirect":
+					// allow configuration of redirect
 				default:
 					types = append(types, k)
 				}

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"path"
+	"strings"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
@@ -140,6 +141,12 @@ func (bs *blobStore) link(ctx context.Context, path string, dgst digest.Digest) 
 
 // readlink returns the linked digest at path.
 func (bs *blobStore) readlink(ctx context.Context, path string) (digest.Digest, error) {
+	parts := strings.Split(path, "/")
+	n := len(parts)
+	if n > 3 && parts[n-1] == "link" && parts[n-3] == "sha256" {
+		return digest.ParseDigest("sha256:" + parts[n-2])
+	}
+
 	content, err := bs.driver.GetContent(ctx, path)
 	if err != nil {
 		return "", err
